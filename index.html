@@ -1,0 +1,311 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tic Tac Toe Ultimate</title>
+<style>
+*{box-sizing:border-box}
+body{
+ margin:0;background:#fff;color:#252535;
+ font-family:Arial,sans-serif;
+ display:flex;justify-content:center;
+ min-height:100dvh;
+}
+.app{
+ width:100%;max-width:460px;
+ padding:22px 18px;
+ text-align:center;
+}
+h1{font-size:31px;margin:8px 0;font-weight:900}
+h1 span{color:#7058ff}
+.sub{font-size:12px;color:#999;letter-spacing:2px}
+.modes{display:flex;gap:9px;margin:25px 0 18px}
+button{cursor:pointer;font-weight:bold;border:0}
+.mode{
+ flex:1;padding:13px 5px;border-radius:12px;
+ background:#f1f0f7;color:#555;font-size:12px;
+}
+.mode.active{background:#7058ff;color:white}
+.scoreboard{display:flex;gap:10px;margin-bottom:20px}
+.score{
+ flex:1;padding:13px 5px;
+ border-radius:15px;background:#f6f5fa;
+}
+.score b{display:block;font-size:26px}
+.score small{font-size:11px;color:#888}
+.xcolor{color:#ff4384}
+.ocolor{color:#248cff}
+.status{
+ padding:15px;border-radius:14px;
+ background:#f7f6fc;font-weight:bold;
+ margin-bottom:18px;font-size:16px;
+}
+.board{
+ display:grid;grid-template-columns:repeat(3,1fr);
+ gap:10px;width:100%;
+}
+.cell{
+ aspect-ratio:1;background:#f4f3fa;
+ border-radius:18px;
+ font-size:clamp(48px,15vw,70px);
+ font-weight:900;display:grid;place-items:center;
+ box-shadow:0 3px 8px #00000008;
+ transition:.2s;
+}
+.cell:active{transform:scale(.94)}
+.cell.x{color:#ff4384}
+.cell.o{color:#248cff}
+.cell.win{
+ background:#e9e4ff;
+ animation:win .6s infinite alternate;
+}
+@keyframes win{
+ to{transform:scale(.96);box-shadow:0 0 20px #7058ff55}
+}
+.actions{display:flex;gap:10px;margin-top:22px}
+.action{
+ flex:1;padding:15px 5px;border-radius:13px;
+ font-size:13px;
+}
+.primary{background:#7058ff;color:white}
+.secondary{background:#f0eff5;color:#333}
+.footer{font-size:11px;color:#aaa;margin-top:25px}
+</style>
+</head>
+<body>
+<div class="app">
+
+<h1>TIC <span>TAC</span> TOE ✦</h1>
+<div class="sub">ULTIMATE CLASSIC GAME</div>
+
+<div class="modes">
+ <button class="mode active" id="two">👥 2 PLAYERS</button>
+ <button class="mode" id="computer">🤖 VS COMPUTER</button>
+</div>
+
+<div class="scoreboard">
+ <div class="score">
+  <b class="xcolor" id="sx">0</b>
+  <small>PLAYER X</small>
+ </div>
+ <div class="score">
+  <b id="draw">0</b>
+  <small>DRAWS</small>
+ </div>
+ <div class="score">
+  <b class="ocolor" id="so">0</b>
+  <small id="oplayer">PLAYER O</small>
+ </div>
+</div>
+
+<div class="status" id="status">❌ Player X's Turn</div>
+
+<div class="board" id="board">
+ <button class="cell" data-i="0"></button>
+ <button class="cell" data-i="1"></button>
+ <button class="cell" data-i="2"></button>
+ <button class="cell" data-i="3"></button>
+ <button class="cell" data-i="4"></button>
+ <button class="cell" data-i="5"></button>
+ <button class="cell" data-i="6"></button>
+ <button class="cell" data-i="7"></button>
+ <button class="cell" data-i="8"></button>
+</div>
+
+<div class="actions">
+ <button class="action primary" id="new">↻ NEW GAME</button>
+ <button class="action secondary" id="reset">RESET SCORE</button>
+</div>
+
+<div class="footer">TIC TAC TOE • THINK • PLAY • WIN</div>
+</div>
+
+<script>
+(()=>{
+const cells=[...document.querySelectorAll(".cell")];
+const status=document.getElementById("status");
+const two=document.getElementById("two");
+const computer=document.getElementById("computer");
+
+let board=Array(9).fill("");
+let turn="X",mode="two",over=false;
+let scores={X:0,O:0,D:0};
+let audio=null;
+
+const wins=[
+ [0,1,2],[3,4,5],[6,7,8],
+ [0,3,6],[1,4,7],[2,5,8],
+ [0,4,8],[2,4,6]
+];
+
+function sound(freq=500,duration=.12){
+ try{
+  audio=audio||new(window.AudioContext||window.webkitAudioContext)();
+  if(audio.state==="suspended")audio.resume();
+  const osc=audio.createOscillator();
+  const gain=audio.createGain();
+  osc.type="sine";
+  osc.frequency.value=freq;
+  gain.gain.setValueAtTime(.13,audio.currentTime);
+  gain.gain.exponentialRampToValueAtTime(.001,audio.currentTime+duration);
+  osc.connect(gain);gain.connect(audio.destination);
+  osc.start();osc.stop(audio.currentTime+duration);
+ }catch(e){}
+}
+
+function updateScore(){
+ document.getElementById("sx").textContent=scores.X;
+ document.getElementById("so").textContent=scores.O;
+ document.getElementById("draw").textContent=scores.D;
+}
+
+function result(){
+ for(const line of wins){
+  if(line.every(i=>board[i] && board[i]===board[line[0]]))
+   return {winner:board[line[0]],line};
+ }
+ if(board.every(Boolean))return {winner:"D"};
+ return null;
+}
+
+function render(){
+ cells.forEach((cell,i)=>{
+  cell.textContent=board[i]==="X"?"×":board[i]==="O"?"○":"";
+  cell.className="cell"+(board[i]?" "+board[i].toLowerCase():"");
+ });
+}
+
+function finish(r){
+ over=true;
+ if(r.winner==="D"){
+  scores.D++;
+  status.textContent="🤝 It's a Draw!";
+  sound(300,.25);
+ }else{
+  scores[r.winner]++;
+  status.textContent="🏆 Player "+r.winner+" Wins!";
+  r.line.forEach(i=>cells[i].classList.add("win"));
+  sound(750,.35);
+ }
+ updateScore();
+}
+
+function play(i){
+ if(over || board[i])return;
+ if(mode==="computer" && turn==="O")return;
+
+ makeMove(i);
+}
+
+function makeMove(i){
+ board[i]=turn;
+ sound(turn==="X"?600:850);
+ render();
+
+ const r=result();
+ if(r){finish(r);return;}
+
+ turn=turn==="X"?"O":"X";
+ updateStatus();
+
+ if(mode==="computer" && turn==="O"){
+  status.textContent="🤖 Computer is thinking...";
+  setTimeout(()=>{
+   if(!over && turn==="O"){
+    const move=bestMove();
+    if(move!==-1)makeMove(move);
+   }
+  },350);
+ }
+}
+
+function updateStatus(){
+ status.textContent=turn==="X"?
+ "❌ Player X's Turn":"🔵 "+(mode==="computer"?"Computer's Turn":"Player O's Turn");
+}
+
+// Minimax AI: computer selects the strongest available move.
+function minimax(b,isMax){
+ const r=getResult(b);
+ if(r){
+  if(r.winner==="O")return 10;
+  if(r.winner==="X")return -10;
+  return 0;
+ }
+ let scores=[];
+ for(let i=0;i<9;i++){
+  if(!b[i]){
+   b[i]=isMax?"O":"X";
+   scores.push(minimax(b,!isMax));
+   b[i]="";
+  }
+ }
+ return isMax?Math.max(...scores):Math.min(...scores);
+}
+
+function getResult(b){
+ for(const line of wins){
+  if(line.every(i=>b[i] && b[i]===b[line[0]]))
+   return {winner:b[line[0]]};
+ }
+ return b.every(Boolean)?{winner:"D"}:null;
+}
+
+function bestMove(){
+ let best=-Infinity,choice=-1;
+ for(let i=0;i<9;i++){
+  if(!board[i]){
+   board[i]="O";
+   let value=minimax(board,false);
+   board[i]="";
+   if(value>best){best=value;choice=i;}
+  }
+ }
+ return choice;
+}
+
+function newGame(){
+ board=Array(9).fill("");
+ turn="X";over=false;
+ render();
+ updateStatus();
+}
+
+cells.forEach((cell,i)=>{
+ cell.addEventListener("click",()=>play(i));
+});
+
+two.onclick=()=>{
+ mode="two";
+ two.classList.add("active");
+ computer.classList.remove("active");
+ document.getElementById("oplayer").textContent="PLAYER O";
+ newGame();
+};
+
+computer.onclick=()=>{
+ mode="computer";
+ computer.classList.add("active");
+ two.classList.remove("active");
+ document.getElementById("oplayer").textContent="COMPUTER";
+ newGame();
+};
+
+document.getElementById("new").onclick=()=>{
+ newGame();sound(500);
+};
+
+document.getElementById("reset").onclick=()=>{
+ scores={X:0,O:0,D:0};
+ updateScore();
+ newGame();sound(400);
+};
+
+updateScore();
+newGame();
+})();
+</script>
+</body>
+</html>
